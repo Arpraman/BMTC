@@ -166,8 +166,4 @@ def bestTransfers(bus_combos,route,intersections):
 
           
 
-# Find intersecting pairs
-intersecting_pairs = find_intersecting_pairs(origin_match, destination_match)
-print(intersecting_pairs)
-    
     
