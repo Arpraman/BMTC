@@ -9,7 +9,7 @@ import pandas as pd
 
 #The excel file contains data in different sheets... the name of the bus number is the sheetname. Only one directional route list is available.
 
-data = pd.ExcelFile(r'C:\Users\Arpita.Pramanick\OneDrive - Unilever\Desktop\BMTC Data\data\Bus Routes4.xlsx')
+data = pd.ExcelFile(r'C:\Users\Arpita.Pramanick\OneDrive - Unilever\Desktop\BMTC Data\BMTC\data\Bus Routes.xlsx')
 
 route = pd.DataFrame()
 
@@ -83,7 +83,10 @@ def findBuses(start,stop,df=route,intersect=intersections):
         bus_list = {k: v for k, v in {k: bestIntersection.get(k, []) for k in bus_combos}.items() if v}
         print("Buses going in the target destination:", bus_list)
         print("Starting location is:",start)
-        return(user_recommendations(buses = bus_list,start=start,stop=stop))
+        if user_recommendations(buses = bus_list,start=start,stop=stop):
+            return(user_recommendations(buses = bus_list,start=start,stop=stop))
+        else:
+            return(bestTransfers(bus_combos, route, intersections, start))
 
 #Given list of intersections, the entire route list and the starting path, this returns the best intersect from the starting position.
 #Best is defined in terms of the intersection that is closes to the start.
@@ -107,6 +110,8 @@ def bestIntersect(intersections,route,start):
                         mindist = distance
                         bestIntersect = val
                 bestIntersection[k] = bestIntersect
+        # else:
+        #     bestIntersection[0]
     return(bestIntersection)
     
 #Generates a human readable recommendation of the action to be taken
@@ -125,45 +130,69 @@ def user_recommendations(buses,start,stop):
         print(recommendation)
     return(recommendation)
     
+     
+
+
+#Best transfers for non-matching combo
+
+def bestTransfers(bus_combos, route, intersections, start):
+    for buspair in bus_combos:
+        if buspair not in intersections:
+            start_bus, last_bus = buspair.split('_')
+            print(f"Processing bus pair: {start_bus} -> {last_bus}")
+            
+            origin_match = {k: v for k, v in intersections.items() if start_bus in k}
+           
+            
+            destination_match = {k: v for k, v in intersections.items() if last_bus in k}
+
+            
+            origin_other = [k.split("_")[0] for k in origin_match.keys() if k.split("_")[0] != start_bus]
+
+            
+            transfer_match = {k: v for bus in origin_other for k, v in destination_match.items() if bus in k}
+            keys_to_remove = [k for k in transfer_match.keys() if k.split("_")[0] == last_bus]
+            transfer_match = {k: v for k, v in transfer_match.items() if k not in keys_to_remove}
+            transfer_other = [k.split("_")[0] for k in transfer_match.keys()]
+
+            
+            
+            vals_to_add = [k.split("_")[0] for k in transfer_match.keys() if k.split("_")[0] in origin_other]
+            origin_other = [x for x in origin_other if x in vals_to_add]
+            
+            for bus in origin_other:
+                origin_match.update({k: v for k, v in origin_match.items() if k in bus})
+            keys_to_remove = [k for k in origin_match.keys() if k.split("_")[0] != start_bus]
+
+            keys_to_remove.extend([k for k in origin_match.keys() if k.split("_")[1] not in transfer_other])
+
+            origin_match = {k: v for k, v in origin_match.items() if k not in keys_to_remove}
+            origin_match = bestIntersect(origin_match,route,start)
+            # transfer_match = bestIntersect(transfer,route,start)
+            print("Origin match:", origin_match)
+            print("Transfer match:", transfer_match)
+            return (create_nested_dict(origin_match, transfer_match))
+
+def create_nested_dict(origin_match, transfer_match):
+    nested_dict = {}
+    used_keys = set()
+
+    for o_key, o_value in origin_match.items():
+        for t_key, t_value in transfer_match.items():
+            common_part = o_key.split('_')[1]
+            if common_part in t_key and o_key not in used_keys:
+                route_key = f'route{len(nested_dict) + 1}'
+                nested_dict[route_key] = [{o_key: o_value}, {t_key: t_value}]
+                used_keys.add(o_key)
+                used_keys.add(t_key)
+
+    return nested_dict
+    
+#Direct bus
+findBuses('thubarahalli','spice garden')
+
 #1 bus transfers between these two
 findBuses('kempegowda bus station','cunningham road')
 
 #No direct buses or 1-bus transfers between these two:
-findBuses('jayadeva hospital','cunningham road')          
-
-def bestTransfers(bus_combos,route,intersections):
-    for buspair in bus_combos:
-        if buspair not in intersections.keys():        
-            start_bus = buspair.split('_')[0]
-            last_bus = buspair.split('_')[1]
-            origin_match = {k: v for k, v in intersections.items() if start_bus in k}
-            print("Origin Match: ",origin_match)
-            destination_match = {k: v for k, v in intersections.items() if last_bus in k}
-            print("Destination match: ",destination_match)
-            origin_other = []
-            for k in origin_match.keys():
-                val= k.split("_")[0]
-                if val!=start_bus:
-                    origin_other.append(val)          
-            print("Origin other: ",origin_other)
-        
-            transfer_match = {}
-            for bus in origin_other:
-                transfer_match.update({k: v for k, v in destination_match.items() if bus in k})
-            keys_to_remove = []
-            for k in transfer_match.keys():
-                val = k.split("_")[0]
-                if val==last_bus:
-                    keys_to_remove.append(k)
-            transfer_match = {k: v for k, v in transfer_match.items() if k not in keys_to_remove}
-            print("Transfer:",transfer_match) 
-            # if not transfer_match:
-            #     bestTransfers(transfer_match,route,intersections)          
-            
-            
-            
-            return transfer_match
-
-#Attempt changes to the code           
-
-    
+findBuses('jayadeva hospital','cunningham road')     
